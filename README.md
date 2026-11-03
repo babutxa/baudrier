@@ -26,6 +26,9 @@ loop:
 |---|---|
 | `step1_template.py` | Shows the raw text the model reads: special tokens, roles and tool descriptions. |
 | `step2_one_cycle.py` | One full agent cycle: the model asks for `get_weather`, the harness calls the real weather API ([Open-Meteo](https://open-meteo.com)), the model answers. |
+| `step3_agent_loop.py` | The agent loop: the model chains several tool calls (list files → read a note → get the weather) until it can answer. |
+| `tools.py` | The tools: `get_weather`, `list_files`, `read_file` (only inside `workspace/`). Each tool is a typed function; the description the model sees is generated from the type hints and the docstring. |
+| `workspace/` | Example notes for the file tools. |
 | `convert_v15_to_mlx.py` | Extracts the text model from the official Apertus v1.5 8B and converts it to MLX 4-bit. |
 | `experiments/` | Tests used to compare Apertus v1.0 and v1.5 on tool calling. |
 
@@ -38,6 +41,18 @@ With the same tool and question, the model must choose the first token of its an
 |---|---|---|
 | Apertus v1.0 8B Instruct | ~3%, rank 4 | writes Python code instead of calling the tool |
 | Apertus v1.5 8B | ~12%, rank 2 (100% with one example) | correct tool call |
+
+Other lessons:
+
+- **Tool results need the right template option.** The Apertus templates close
+  the assistant turn after a tool result, unless you pass
+  `continue_assistant_message=True`. Without it, the model continues from a
+  closed turn and the next tool call breaks.
+- **The system prompt matters.** Without instructions, the model asked the user
+  to check the weather; with "never ask the user to look up something that one
+  of your tools can find", it called the tool itself.
+- **Small models make reasoning mistakes.** In the notes task, the 8B model
+  sometimes checks the weather in the departure city instead of the destination.
 
 ## Setup
 
@@ -79,7 +94,19 @@ Run the scripts from the project folder:
 ```
 .venv/bin/python step1_template.py
 .venv/bin/python step2_one_cycle.py "Do I need an umbrella in Barcelona today?"
+.venv/bin/python step3_agent_loop.py "Look at my notes. Where am I going today, and do I need an umbrella?"
 ```
+
+## Type checking
+
+All scripts have type hints. To check them (optional):
+
+```
+.venv/bin/pip install mypy
+.venv/bin/mypy --ignore-missing-imports tools.py step3_agent_loop.py
+```
+
+Check the standalone scripts one by one (they define the same names).
 
 ## License
 

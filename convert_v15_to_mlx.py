@@ -19,36 +19,42 @@ import json
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 import mlx.core as mx
 from huggingface_hub import snapshot_download
 from mlx_lm import convert
 
-SOURCE = "swiss-ai/Apertus-v1.5-8B"
-HERE = Path(__file__).parent
-TMP = HERE / "models" / "tmp-apertus-v1.5-8b-text-bf16"
-OUT = HERE / "models" / "apertus-v1.5-8b-text-4bit"
+SOURCE: str = "swiss-ai/Apertus-v1.5-8B"
+HERE: Path = Path(__file__).parent
+TMP: Path = HERE / "models" / "tmp-apertus-v1.5-8b-text-bf16"
+OUT: Path = HERE / "models" / "apertus-v1.5-8b-text-4bit"
 
 if OUT.exists():
     sys.exit(f"{OUT} already exists, delete it first to convert again.")
 
 # Download only the text weights, configs and tokenizer (skip images and
 # audio). Files already in the cache are not downloaded again.
-src = Path(snapshot_download(
+src: Path = Path(snapshot_download(
     SOURCE,
     allow_patterns=["model-apertus-model-*.safetensors", "*.json", "chat_template.jinja"],
 ))
-src_config = json.loads((src / "config.json").read_text())
-text = src_config["text_config"]
-TEXT_VOCAB = text["output_vocab_size"]  # 131072 text tokens
+src_config: dict[str, Any] = json.loads((src / "config.json").read_text())
+text: dict[str, Any] = src_config["text_config"]
+TEXT_VOCAB: int = text["output_vocab_size"]  # 131072 text tokens
 
 TMP.mkdir(parents=True, exist_ok=True)
 
 # 1) Weights: one shard at a time, to keep memory low.
 for shard in sorted(src.glob("model-apertus-model-*.safetensors")):
     print("Extracting", shard.name)
-    weights = {}
-    for name, w in mx.load(str(shard)).items():
+    weights: dict[str, mx.array] = {}
+    # mx.load returns an array, a dict or a tuple, depending on the file
+    # format. A .safetensors file gives a dict: we check it, which also
+    # tells the type checker the exact type.
+    loaded = mx.load(str(shard))
+    assert isinstance(loaded, dict), f"unexpected content in {shard.name}"
+    for name, w in loaded.items():
         if name.startswith("model.language_model."):
             name = "model." + name[len("model.language_model."):]
         elif name != "lm_head.weight":
@@ -59,10 +65,10 @@ for shard in sorted(src.glob("model-apertus-model-*.safetensors")):
     mx.save_safetensors(str(TMP / shard.name), weights, metadata={"format": "mlx"})
 
 # 2) Config in the v1.0 ("apertus") format that mlx-lm knows.
-rope = dict(text["rope_parameters"])
-rope_theta = rope.pop("rope_theta")
+rope: dict[str, Any] = dict(text["rope_parameters"])
+rope_theta: float = rope.pop("rope_theta")
 rope["type"] = rope["rope_type"]
-config = {
+config: dict[str, Any] = {
     "model_type": "apertus",
     "architectures": ["ApertusForCausalLM"],
     "vocab_size": TEXT_VOCAB,

@@ -11,23 +11,30 @@ import json
 import sys
 import urllib.parse
 import urllib.request
+from typing import Any, Callable
 
 from mlx_lm import load, stream_generate
 
-MODEL = "models/apertus-v1.5-8b-text-4bit"
+# Type aliases (like "using" in C++):
+# a message is a dict like {"role": "user", "content": "..."};
+# a tool call is (tool name, arguments), e.g. ("get_weather", {"city": "Zurich"}).
+Message = dict[str, Any]
+ToolCall = tuple[str, dict[str, Any]]
+
+MODEL: str = "models/apertus-v1.5-8b-text-4bit"
 
 
 # ---------------------------------------------------------------------------
 # The real tool: plain Python, nothing to do with AI.
 # ---------------------------------------------------------------------------
 
-def fetch_json(url, params):
+def fetch_json(url: str, params: dict[str, Any]) -> Any:
     with urllib.request.urlopen(url + "?" + urllib.parse.urlencode(params)) as r:
         return json.load(r)
 
 
 # A few WMO weather codes used by Open-Meteo, as words.
-WEATHER_CODES = {
+WEATHER_CODES: dict[int, str] = {
     0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
     45: "fog", 48: "fog", 51: "light drizzle", 53: "drizzle", 55: "dense drizzle",
     61: "light rain", 63: "rain", 65: "heavy rain", 71: "light snow",
@@ -36,7 +43,7 @@ WEATHER_CODES = {
 }
 
 
-def get_weather(city):
+def get_weather(city: str) -> str:
     # 1) City name -> coordinates.
     places = fetch_json("https://geocoding-api.open-meteo.com/v1/search",
                         {"name": city, "count": 1})
@@ -62,10 +69,10 @@ def get_weather(city):
 
 # The harness's link between tool NAMES (what the model writes)
 # and tool FUNCTIONS (what actually runs).
-TOOL_FUNCTIONS = {"get_weather": get_weather}
+TOOL_FUNCTIONS: dict[str, Callable[..., str]] = {"get_weather": get_weather}
 
 # What the model is told about the tools (same as in step 1).
-TOOL_DESCRIPTIONS = [
+TOOL_DESCRIPTIONS: list[dict[str, Any]] = [
     {
         "name": "get_weather",
         "description": "Get the current weather for a city.",
@@ -85,23 +92,30 @@ TOOL_DESCRIPTIONS = [
 # ---------------------------------------------------------------------------
 
 print("Loading Apertus...")
-model, tokenizer = load(MODEL)
+# load() is declared to return 2 or 3 values (3 with return_config=True),
+# so we take the first two by index: correct for the type checker in both cases.
+loaded = load(MODEL)
+model, tokenizer = loaded[0], loaded[1]
 
 TOOLS_PREFIX = "<|tools_prefix|>"
 TOOLS_SUFFIX = "<|tools_suffix|>"
-TOOLS_SUFFIX_ID = tokenizer.convert_tokens_to_ids(TOOLS_SUFFIX)
+TOOLS_SUFFIX_ID: int = tokenizer.convert_tokens_to_ids(TOOLS_SUFFIX)
 
 
-def generate(messages, add_generation_prompt):
+def generate(messages: list[Message], add_generation_prompt: bool) -> str:
     """Run the model from the conversation; return the new raw text."""
+    # continue_assistant_message: after tool results, keep the assistant turn
+    # OPEN, so the model continues it. Without it, the v1.5 template closes
+    # the turn with <|assistant_end|>.
     text = tokenizer.apply_chat_template(
         messages, tools=TOOL_DESCRIPTIONS, tokenize=False,
         add_generation_prompt=add_generation_prompt,
+        continue_assistant_message=not add_generation_prompt,
     )
     # The text already contains <s>, so don't add special tokens again.
     prompt_ids = tokenizer.encode(text, add_special_tokens=False)
 
-    new_ids = []
+    new_ids: list[int] = []
     for response in stream_generate(model, tokenizer, prompt_ids, max_tokens=300):
         new_ids.append(response.token)
         if response.token == TOOLS_SUFFIX_ID:
@@ -114,7 +128,7 @@ def generate(messages, add_generation_prompt):
     return raw
 
 
-def parse_tool_calls(raw):
+def parse_tool_calls(raw: str) -> list[ToolCall]:
     """'<|tools_prefix|>[{"get_weather": {"city": "X"}}]<|tools_suffix|>'
     -> [("get_weather", {"city": "X"})]"""
     inside = raw.split(TOOLS_PREFIX, 1)[1].split(TOOLS_SUFFIX, 1)[0]
@@ -125,8 +139,8 @@ def parse_tool_calls(raw):
 # One cycle.
 # ---------------------------------------------------------------------------
 
-question = sys.argv[1] if len(sys.argv) > 1 else "Do I need an umbrella in Barcelona today?"
-messages = [
+question: str = sys.argv[1] if len(sys.argv) > 1 else "Do I need an umbrella in Barcelona today?"
+messages: list[Message] = [
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": question},
 ]
@@ -141,8 +155,8 @@ if TOOLS_PREFIX not in raw:
     sys.exit()
 
 print("2) The harness runs the tool(s):")
-calls = parse_tool_calls(raw)
-tool_messages = []
+calls: list[ToolCall] = parse_tool_calls(raw)
+tool_messages: list[Message] = []
 for name, args in calls:
     result = TOOL_FUNCTIONS[name](**args)
     print(f"  {name}({args}) -> {result!r}")

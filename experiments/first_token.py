@@ -12,6 +12,9 @@ Usage:
 # sys gives access to the command-line arguments (sys.argv).
 import sys
 
+# Any: "any type", for values whose type we don't describe in detail.
+from typing import Any, cast
+
 # mlx.core is Apple's array library (like numpy, but runs on the M1 GPU).
 import mlx.core as mx
 
@@ -23,15 +26,18 @@ from mlx_lm import load
 #   python experiments/first_token.py models/apertus-v1.5-8b-text-4bit
 #   sys.argv[0] = "experiments/first_token.py", sys.argv[1] = "models/apertus-..."
 # If no model is given, use v1.0.
-MODEL = sys.argv[1] if len(sys.argv) > 1 else "models/apertus-v1.0-8b-4bit"
+MODEL: str = sys.argv[1] if len(sys.argv) > 1 else "models/apertus-v1.0-8b-4bit"
 print("Model:", MODEL)
 
 # Load the model (the neural network) and its tokenizer (text <-> token IDs).
-model, tokenizer = load(MODEL)
+# load() is declared to return 2 or 3 values (3 with return_config=True),
+# so we take the first two by index: correct for the type checker in both cases.
+loaded = load(MODEL)
+model, tokenizer = loaded[0], loaded[1]
 
 # Description of the tool, in the format the Apertus chat template expects.
 # The model only sees this text. There is no real function behind it here.
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "name": "get_weather",                               # the name the model must write
         "description": "Get the current weather for a city.",  # helps the model decide when to use it
@@ -47,12 +53,12 @@ TOOLS = [
 
 # The ID of the special token that starts a tool call.
 # If the model chooses this token first, it wants to call a tool.
-PREFIX_ID = tokenizer.convert_tokens_to_ids("<|tools_prefix|>")
+PREFIX_ID: int = tokenizer.convert_tokens_to_ids("<|tools_prefix|>")
 
 # Run the test twice: with Deliberation (thinking mode) disabled, then enabled.
 for think in (False, True):
     # Only one user message. No system message, so the template adds its default one.
-    msgs = [{"role": "user", "content": "Do I need an umbrella in Barcelona today?"}]
+    msgs: list[dict[str, Any]] = [{"role": "user", "content": "Do I need an umbrella in Barcelona today?"}]
 
     # Build the raw text with the chat template.
     # enable_thinking is passed to the template: it writes
@@ -80,12 +86,15 @@ for think in (False, True):
     # The 8 most probable tokens.
     # argsort sorts from smallest to largest, so we sort -probs (negative)
     # to get the largest first. [:8] keeps the first 8 token IDs.
-    top = mx.argsort(-probs)[:8].tolist()
+    # .tolist() is declared to return a number or nested lists; for a 1D array
+    # of indices it is a list[int]. cast() tells the type checker
+    # (like static_cast, but nothing changes at run time).
+    top = cast(list[int], mx.argsort(-probs)[:8].tolist())
 
     # The rank of <|tools_prefix|> among all 131072 tokens.
     # (probs > probs[PREFIX_ID]) is True for each token MORE probable than it.
     # Counting them (+1) gives its position: 1 = most probable.
-    rank = int((probs > probs[PREFIX_ID]).sum().item()) + 1
+    rank: int = cast(int, (probs > probs[PREFIX_ID]).sum().item()) + 1
 
     # Print the top 8: probability and the token as text.
     # .item() converts a 1-value MLX array into a normal Python number.

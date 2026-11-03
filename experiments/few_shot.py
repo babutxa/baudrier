@@ -5,6 +5,9 @@ example, the assistant uses the tool. Then we check if the model
 copies this behaviour ("in-context learning").
 """
 
+# Any: "any type", for values whose type we don't describe in detail.
+from typing import Any, cast
+
 # mlx.core is Apple's array library (like numpy, but runs on the M1 GPU).
 import mlx.core as mx
 
@@ -12,13 +15,19 @@ import mlx.core as mx
 # stream_generate: generates tokens one by one, and gives us each new token.
 from mlx_lm import load, stream_generate
 
+# Type alias: a message is a dict like {"role": "user", "content": "..."}.
+Message = dict[str, Any]
+
 # Load the model (the neural network) and its tokenizer (text <-> token IDs).
-# model, tokenizer = load("models/apertus-v1.0-8b-4bit")
-model, tokenizer = load("models/apertus-v1.5-8b-text-4bit")
+# load() is declared to return 2 or 3 values (3 with return_config=True),
+# so we take the first two by index: correct for the type checker in both cases.
+# loaded = load("models/apertus-v1.0-8b-4bit")
+loaded = load("models/apertus-v1.5-8b-text-4bit")
+model, tokenizer = loaded[0], loaded[1]
 
 # Description of the tool, in the format the Apertus chat template expects.
 # The model only sees this text. There is no real function behind it here.
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "name": "get_weather",  # the name the model must write
         "description": "Get the current weather for a city.",  # helps the model decide when to use it
@@ -35,12 +44,12 @@ TOOLS = [
 # The token IDs of the two special tokens that surround a tool call:
 #   <|tools_prefix|>[{"get_weather": {"city": "..."}}]<|tools_suffix|>
 # We need the IDs because the model works with numbers, not text.
-PREFIX_ID = tokenizer.convert_tokens_to_ids("<|tools_prefix|>")
-SUFFIX_ID = tokenizer.convert_tokens_to_ids("<|tools_suffix|>")
+PREFIX_ID: int = tokenizer.convert_tokens_to_ids("<|tools_prefix|>")
+SUFFIX_ID: int = tokenizer.convert_tokens_to_ids("<|tools_suffix|>")
 
 # The example conversation (the "shot" in "few-shot").
 # It shows the model a full tool cycle: question -> tool call -> result -> answer.
-example = [
+example: list[Message] = [
     # 1) A user asks something that needs the tool.
     {"role": "user", "content": "Is it cold in Oslo right now?"},
     # 2) The assistant does not answer with text: it calls the tool.
@@ -67,7 +76,7 @@ example = [
 # Three test questions:
 #   - two that need the weather tool (one in English, one in Catalan),
 #   - one that does NOT need it (to check the model does not call tools for everything).
-questions = [
+questions: list[str] = [
     "Do I need an umbrella in Barcelona today?",
     "Quin temps fa a Girona?",
     "What is the capital of France?",
@@ -75,7 +84,7 @@ questions = [
 
 for q in questions:
     # The full conversation: the example first, then the real question.
-    msgs = example + [{"role": "user", "content": q}]
+    msgs: list[Message] = example + [{"role": "user", "content": q}]
 
     # Build the raw text with the chat template (special tokens + tool list).
     # add_generation_prompt=True adds <|assistant_start|> at the end:
@@ -86,7 +95,7 @@ for q in questions:
 
     # Text -> list of token IDs.
     # add_special_tokens=False because the text already contains <s>.
-    ids = tokenizer.encode(text, add_special_tokens=False)
+    ids: list[int] = tokenizer.encode(text, add_special_tokens=False)
 
     # --- Part 1: probability of the first token ---------------------------
     # Run the network once on all the tokens.
@@ -99,10 +108,12 @@ for q in questions:
     # float32 gives a more precise result than the model's 16-bit numbers.
     probs = mx.softmax(last_logits.astype(mx.float32))
     # The probability that the next token is <|tools_prefix|> (start of a tool call).
-    p = probs[PREFIX_ID].item()
+    # .item() is declared as int | float | complex. A probability is a float:
+    # cast() tells the type checker (like static_cast, but nothing changes at run time).
+    p = cast(float, probs[PREFIX_ID].item())
 
     # --- Part 2: let the model write -----------------------------------------
-    out = []  # the new token IDs written by the model
+    out: list[int] = []  # the new token IDs written by the model
     # Generate up to 80 tokens. By default this is greedy: always the most
     # probable token. It stops by itself at the end token <|assistant_end|>.
     for r in stream_generate(model, tokenizer, ids, max_tokens=80):

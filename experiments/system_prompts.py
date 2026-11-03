@@ -11,24 +11,33 @@ Usage:
 # sys gives access to the command-line arguments (sys.argv).
 import sys
 
+# Any: "any type", for values whose type we don't describe in detail.
+from typing import Any
+
 # load: reads the model weights and the tokenizer from disk.
 # stream_generate: generates tokens one by one, and gives us each new token.
 from mlx_lm import load, stream_generate
 
 # Choose the model from the command line (default: v1.0).
-MODEL = sys.argv[1] if len(sys.argv) > 1 else "models/apertus-v1.0-8b-4bit"
+MODEL: str = sys.argv[1] if len(sys.argv) > 1 else "models/apertus-v1.0-8b-4bit"
 print("Model:", MODEL, "\n")
 
+# Type alias: a message is a dict like {"role": "user", "content": "..."}.
+Message = dict[str, Any]
+
 # Load the model (the neural network) and its tokenizer (text <-> token IDs).
-model, tokenizer = load(MODEL)
+# load() is declared to return 2 or 3 values (3 with return_config=True),
+# so we take the first two by index: correct for the type checker in both cases.
+loaded = load(MODEL)
+model, tokenizer = loaded[0], loaded[1]
 
 # The ID of the special token that ends a tool call. We stop there,
 # because in a real harness our code would now run the tool.
-SUFFIX_ID = tokenizer.convert_tokens_to_ids("<|tools_suffix|>")
+SUFFIX_ID: int = tokenizer.convert_tokens_to_ids("<|tools_suffix|>")
 
 # Description of the tool, in the format the Apertus chat template expects.
 # The model only sees this text. There is no real function behind it here.
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "name": "get_weather",                               # the name the model must write
         "description": "Get the current weather for a city.",  # helps the model decide when to use it
@@ -43,10 +52,10 @@ TOOLS = [
 ]
 
 # The question. It is the same for all variants.
-QUESTION = "Do I need an umbrella in Barcelona today?"
+QUESTION: str = "Do I need an umbrella in Barcelona today?"
 
 # The variants to compare. Each one is a list with 0 or 1 system message.
-variants = {
+variants: dict[str, list[Message]] = {
     # A: a short, generic system message.
     "A: helpful assistant": [
         {"role": "system", "content": "You are a helpful assistant."},
@@ -65,7 +74,7 @@ variants = {
 # .items() gives each (name, list of system messages) pair.
 for name, system_messages in variants.items():
     # The conversation: the system message (if any), then the user question.
-    msgs = system_messages + [{"role": "user", "content": QUESTION}]
+    msgs: list[Message] = system_messages + [{"role": "user", "content": QUESTION}]
 
     # Build the raw text with the chat template (special tokens + tool list).
     # add_generation_prompt=True adds <|assistant_start|> at the end:
@@ -76,9 +85,9 @@ for name, system_messages in variants.items():
 
     # Text -> list of token IDs.
     # add_special_tokens=False because the text already contains <s>.
-    ids = tokenizer.encode(text, add_special_tokens=False)
+    ids: list[int] = tokenizer.encode(text, add_special_tokens=False)
 
-    out = []  # the new token IDs written by the model
+    out: list[int] = []  # the new token IDs written by the model
     # Generate up to 120 tokens. By default this is greedy: always the most
     # probable token. It stops by itself at the end token <|assistant_end|>.
     for r in stream_generate(model, tokenizer, ids, max_tokens=120):
