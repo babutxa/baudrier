@@ -51,8 +51,21 @@ Other lessons:
 - **The system prompt matters.** Without instructions, the model asked the user
   to check the weather; with "never ask the user to look up something that one
   of your tools can find", it called the tool itself.
-- **Small models make reasoning mistakes.** In the notes task, the 8B model
-  sometimes checks the weather in the departure city instead of the destination.
+- **Small models make reasoning mistakes, and quantization matters.** In the
+  notes task ("Where am I going today, and do I need an umbrella?"), the note says
+  "Day trip to Lucerne ... 10:00 train from Zurich":
+
+  | Apertus v1.5 8B | Size | Tool calls | Result |
+  |---|---|---|---|
+  | 4-bit | 4.3 GB | list_files → read today.md → read shopping.txt → weather **Zurich** | wrong city |
+  | 8-bit | 8.0 GB | list_files → read today.md → weather **Lucerne** | correct |
+
+  One task and one greedy run each: a strong hint, not a proof. The 8-bit
+  model is about 2× slower, and it is not better at everything: it once wrote
+  a tool call without arguments as `{"list_files": }` (invalid JSON).
+- **The harness must tolerate small format errors.** `{"list_files": }` is
+  repaired to `{"list_files": {}}` before parsing. If a call is still invalid,
+  the harness sends the error back to the model and lets it try again.
 
 ## Setup
 
@@ -82,7 +95,8 @@ The models are not in this repository (several GB). Create them in `models/`:
 ```
 
 The script downloads the needed files (~16 GB) if they are not in the Hugging Face
-cache yet, then creates `models/apertus-v1.5-8b-text-4bit/`.
+cache yet, then creates `models/apertus-v1.5-8b-text-4bit/`. For the 8-bit version
+(8 GB, fewer mistakes, slower), run `.venv/bin/python convert_v15_to_mlx.py 8`.
 
 This is a text-only conversion: image and audio input are removed. It is my own
 adaptation, not an official method.
@@ -95,6 +109,7 @@ Run the scripts from the project folder:
 .venv/bin/python step1_template.py
 .venv/bin/python step2_one_cycle.py "Do I need an umbrella in Barcelona today?"
 .venv/bin/python step3_agent_loop.py "Look at my notes. Where am I going today, and do I need an umbrella?"
+.venv/bin/python step3_agent_loop.py --model models/apertus-v1.5-8b-text-8bit
 ```
 
 ## Type checking

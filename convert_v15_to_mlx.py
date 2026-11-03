@@ -1,4 +1,8 @@
-"""Extract the text model from Apertus v1.5 8B and convert it to MLX 4-bit.
+"""Extract the text model from Apertus v1.5 8B and convert it to MLX (4 or 8 bits).
+
+Usage:
+    python convert_v15_to_mlx.py      # 4 bits -> models/apertus-v1.5-8b-text-4bit
+    python convert_v15_to_mlx.py 8    # 8 bits -> models/apertus-v1.5-8b-text-8bit
 
 Apertus v1.5 = the Apertus v1.0 text architecture + image and audio
 tokenizers around it. mlx-lm already supports the v1.0 architecture, so:
@@ -6,7 +10,7 @@ tokenizers around it. mlx-lm already supports the v1.0 architecture, so:
   1. copy only the language model weights, renamed to the v1.0 layout,
      keeping only the 131,072 text rows of the input embedding table;
   2. write a v1.0-style config with the v1.5 values;
-  3. let mlx-lm quantize the result to 4 bits.
+  3. let mlx-lm quantize the result (4 or 8 bits).
 
 Images and audio are dropped: this gives a text-only model.
 
@@ -26,9 +30,13 @@ from huggingface_hub import snapshot_download
 from mlx_lm import convert
 
 SOURCE: str = "swiss-ai/Apertus-v1.5-8B"
+# Bits per weight: 4 (smaller, faster) or 8 (almost like the original).
+BITS: int = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+if BITS not in (4, 8):
+    sys.exit("BITS must be 4 or 8.")
 HERE: Path = Path(__file__).parent
 TMP: Path = HERE / "models" / "tmp-apertus-v1.5-8b-text-bf16"
-OUT: Path = HERE / "models" / "apertus-v1.5-8b-text-4bit"
+OUT: Path = HERE / "models" / f"apertus-v1.5-8b-text-{BITS}bit"
 
 if OUT.exists():
     sys.exit(f"{OUT} already exists, delete it first to convert again.")
@@ -90,7 +98,7 @@ for f in ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json",
         shutil.copy(src / f, TMP / f)
 
 # 3) Quantize to 4 bits.
-print("Quantizing to 4 bits...")
-convert(str(TMP), mlx_path=str(OUT), quantize=True, q_bits=4, q_group_size=64)
+print(f"Quantizing to {BITS} bits...")
+convert(str(TMP), mlx_path=str(OUT), quantize=True, q_bits=BITS, q_group_size=64)
 shutil.rmtree(TMP)
 print("Done:", OUT)

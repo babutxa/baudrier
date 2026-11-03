@@ -10,9 +10,11 @@ only runs them and gives back the results.
 
 Usage:
     python step3_agent_loop.py "Look at my notes. Where am I going today, and do I need an umbrella?"
+    python step3_agent_loop.py --model models/apertus-v1.5-8b-text-8bit "..."
 """
+import argparse
 import json
-import sys
+import re
 from typing import Any
 
 from mlx_lm import load, stream_generate
@@ -25,14 +27,22 @@ from tools import TOOL_DESCRIPTIONS, TOOL_FUNCTIONS, ToolResult
 Message = dict[str, Any]
 ToolCall = tuple[str, dict[str, Any]]
 
-MODEL: str = "models/apertus-v1.5-8b-text-4bit"
+# Command-line options (argparse also generates --help).
+parser = argparse.ArgumentParser(description="Baudrier agent loop with Apertus.")
+parser.add_argument("question", nargs="?",
+                    default="Look at my notes. Where am I going today, and do I need an umbrella?")
+parser.add_argument("--model", default="models/apertus-v1.5-8b-text-4bit",
+                    help="path of the MLX model folder")
+cli = parser.parse_args()
+
+MODEL: str = cli.model
 MAX_STEPS: int = 8  # safety: stop if the model never gives a final answer
 
 TOOLS_PREFIX = "<|tools_prefix|>"
 TOOLS_SUFFIX = "<|tools_suffix|>"
 ASSISTANT_END = "<|assistant_end|>"
 
-print("Loading Apertus...")
+print(f"Loading {MODEL}...")
 # load() is declared to return 2 or 3 values (3 with return_config=True),
 # so we take the first two by index: correct for the type checker in both cases.
 loaded = load(MODEL)
@@ -64,18 +74,36 @@ def generate(messages: list[Message], add_generation_prompt: bool) -> str:
     return tokenizer.decode(new_ids)
 
 
+class BadToolCall(Exception):
+    """The model wrote a tool call that is not valid JSON."""
+
+    def __init__(self, text: str, call_text: str) -> None:
+        super().__init__(call_text)
+        self.text = text            # what the model wrote before the call
+        self.call_text = call_text  # the broken call
+
+
 def split_output(raw: str) -> tuple[str, list[ToolCall]]:
     """Split the raw output into (text, tool_calls).
 
     'Let me check.<|tools_prefix|>[{"get_weather": {"city": "X"}}]<|tools_suffix|>'
     -> ('Let me check.', [("get_weather", {"city": "X"})])
+
+    Raises BadToolCall if the call cannot be parsed.
     """
     raw = raw.replace(ASSISTANT_END, "")
     if TOOLS_PREFIX not in raw:
         return raw.strip(), []
     text, rest = raw.split(TOOLS_PREFIX, 1)
     inside = rest.split(TOOLS_SUFFIX, 1)[0]
-    calls = [(name, args) for call in json.loads(inside) for name, args in call.items()]
+    # Repair a known small-model mistake: a tool without arguments written as
+    # {"list_files": } instead of {"list_files": {}}. In valid JSON a key is
+    # always followed by a value, so '": }' only appears in this broken case.
+    inside = re.sub(r'":\s*}', '": {}}', inside)
+    try:
+        calls = [(name, args) for call in json.loads(inside) for name, args in call.items()]
+    except (json.JSONDecodeError, AttributeError, TypeError) as e:
+        raise BadToolCall(text.strip(), inside) from e
     return text.strip(), calls
 
 
@@ -89,8 +117,7 @@ def run_tool(name: str, args: dict[str, Any]) -> ToolResult:
         return f"Error running {name}: {e}"
 
 
-question: str = sys.argv[1] if len(sys.argv) > 1 else \
-    "Look at my notes. Where am I going today, and do I need an umbrella?"
+question: str = cli.question
 # The system prompt tells the model to do the work itself with the tools,
 # instead of asking the user to do it (small models often stop too early).
 SYSTEM_PROMPT = (
@@ -116,10 +143,17 @@ for step in range(1, MAX_STEPS + 1):
 
     try:
         text, calls = split_output(raw)
-    except json.JSONDecodeError:
-        # The model wrote a broken tool call. Show it and stop.
-        print(f"  Could not parse the tool call: {raw!r}")
-        break
+    except BadToolCall as bad:
+        # The model wrote a broken tool call. Don't stop: close its turn and
+        # tell it what went wrong, so it can try again. (A "tool" message
+        # needs a valid call before it, so the error comes as a user message.)
+        print(f"  BAD TOOL CALL: {bad.call_text!r} -> asking the model to retry")
+        messages.append({"role": "assistant", "content": bad.text})
+        messages.append({"role": "user", "content":
+                         f"Your tool call was not valid JSON: {bad.call_text}. "
+                         "Please call the tool again with valid JSON."})
+        add_generation_prompt = True  # a new assistant turn starts
+        continue
 
     if text:
         print(f"  TEXT: {text}")
