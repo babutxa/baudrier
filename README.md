@@ -63,9 +63,11 @@ The models are not in this repository (several GB). Create them in `models/`:
 [the model page](https://huggingface.co/swiss-ai/Apertus-v1.5-8B), then run `.venv/bin/hf auth login`):
 
 ```
-.venv/bin/python -c "from huggingface_hub import snapshot_download as s; s('swiss-ai/Apertus-v1.5-8B', allow_patterns=['model-apertus-model-*.safetensors', '*.json', 'chat_template.jinja', 'tokenizer*'])"
 .venv/bin/python convert_v15_to_mlx.py
 ```
+
+The script downloads the needed files (~16 GB) if they are not in the Hugging Face
+cache yet, then creates `models/apertus-v1.5-8b-text-4bit/`.
 
 This is a text-only conversion: image and audio input are removed. It is my own
 adaptation, not an official method.

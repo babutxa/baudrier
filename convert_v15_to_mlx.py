@@ -9,6 +9,11 @@ tokenizers around it. mlx-lm already supports the v1.0 architecture, so:
   3. let mlx-lm quantize the result to 4 bits.
 
 Images and audio are dropped: this gives a text-only model.
+
+The model is gated: first accept the conditions on
+https://huggingface.co/swiss-ai/Apertus-v1.5-8B and run `hf auth login`.
+The script downloads the needed files (~16 GB) if they are not in the
+Hugging Face cache yet.
 """
 import json
 import shutil
@@ -24,17 +29,19 @@ HERE = Path(__file__).parent
 TMP = HERE / "models" / "tmp-apertus-v1.5-8b-text-bf16"
 OUT = HERE / "models" / "apertus-v1.5-8b-text-4bit"
 
-# Only the text weights, configs and tokenizer were downloaded.
+if OUT.exists():
+    sys.exit(f"{OUT} already exists, delete it first to convert again.")
+
+# Download only the text weights, configs and tokenizer (skip images and
+# audio). Files already in the cache are not downloaded again.
 src = Path(snapshot_download(
-    SOURCE, local_files_only=True,
+    SOURCE,
     allow_patterns=["model-apertus-model-*.safetensors", "*.json", "chat_template.jinja"],
 ))
 src_config = json.loads((src / "config.json").read_text())
 text = src_config["text_config"]
 TEXT_VOCAB = text["output_vocab_size"]  # 131072 text tokens
 
-if OUT.exists():
-    sys.exit(f"{OUT} already exists, delete it first to convert again.")
 TMP.mkdir(parents=True, exist_ok=True)
 
 # 1) Weights: one shard at a time, to keep memory low.
