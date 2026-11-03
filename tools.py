@@ -40,7 +40,7 @@ WEATHER_CODES: dict[int, str] = {
 
 
 def get_weather(city: str) -> str:
-    """Get the current weather and today's rain probability for a city.
+    """Get the weather for a city today: conditions, temperature, rain probability, cloud cover, sunshine hours and UV index.
 
     Args:
         city: City name, e.g. Barcelona
@@ -52,20 +52,24 @@ def get_weather(city: str) -> str:
         return f"Error: city '{city}' not found."
     place = places["results"][0]
 
-    # 2) Coordinates -> current weather and today's rain probability.
+    # 2) Coordinates -> current weather, and today's rain, sun and UV.
     w = fetch_json("https://api.open-meteo.com/v1/forecast", {
         "latitude": place["latitude"],
         "longitude": place["longitude"],
-        "current": "temperature_2m,weather_code,wind_speed_10m",
-        "daily": "precipitation_probability_max",
+        "current": "temperature_2m,weather_code,wind_speed_10m,cloud_cover",
+        "daily": "precipitation_probability_max,sunshine_duration,uv_index_max",
         "timezone": "auto",
         "forecast_days": 1,
     })
     now = w["current"]
+    day = w["daily"]
+    sunshine_hours = day["sunshine_duration"][0] / 3600  # Open-Meteo gives seconds
     return (f"{place['name']} ({place.get('country', '')}): "
             f"{WEATHER_CODES.get(now['weather_code'], 'code ' + str(now['weather_code']))}, "
             f"{now['temperature_2m']}°C, wind {now['wind_speed_10m']} km/h, "
-            f"rain probability today {w['daily']['precipitation_probability_max'][0]}%")
+            f"cloud cover {now['cloud_cover']}%. "
+            f"Today: rain probability {day['precipitation_probability_max'][0]}%, "
+            f"sunshine {sunshine_hours:.1f} h, UV index max {day['uv_index_max'][0]}")
 
 
 # ---------------------------------------------------------------------------

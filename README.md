@@ -26,8 +26,10 @@ loop:
 |---|---|
 | `step1_template.py` | Shows the raw text the model reads: special tokens, roles and tool descriptions. |
 | `step2_one_cycle.py` | One full agent cycle: the model asks for `get_weather`, the harness calls the real weather API ([Open-Meteo](https://open-meteo.com)), the model answers. |
-| `step3_agent_loop.py` | The agent loop: the model chains several tool calls (list files → read a note → get the weather) until it can answer. |
-| `tools.py` | The tools: `get_weather`, `list_files`, `read_file` (only inside `workspace/`). Each tool is a typed function; the description the model sees is generated from the type hints and the docstring. |
+| `baudrier.py` | **The chat**, like Claude Code: you write, the agent answers (using tools), you write again. It remembers the conversation. |
+| `agent.py` | The `Agent` class: the model, the inner loop (`ask()`: tool calls until the answer), tool-call parsing and the protections. |
+| `step3_agent_loop.py` | The agent loop for one question (uses `agent.py`). |
+| `tools.py` | The tools: `get_weather` (conditions, rain, clouds, sunshine, UV), `list_files`, `read_file` (only inside `workspace/`). Each tool is a typed function; the description the model sees is generated from the type hints and the docstring. |
 | `workspace/` | Example notes for the file tools. |
 | `convert_v15_to_mlx.py` | Extracts the text model from the official Apertus v1.5 8B and converts it to MLX 4-bit. |
 | `experiments/` | Tests used to compare Apertus v1.0 and v1.5 on tool calling. |
@@ -66,6 +68,20 @@ Other lessons:
 - **The harness must tolerate small format errors.** `{"list_files": }` is
   repaired to `{"list_files": {}}` before parsing. If a call is still invalid,
   the harness sends the error back to the model and lets it try again.
+- **Without context, the model invents.** Asked "Where am I going today? Do I
+  need sunglasses?", it called `get_weather("New York")`. Later, it kept
+  reusing that old New York result even after finding Lucerne in the notes.
+  Telling it in the system prompt that the user's plans are in the notes fixed it.
+- **Give the tools the data the question needs.** For sunglasses, rain
+  probability is not enough: `get_weather` now also returns cloud cover,
+  sunshine hours and the UV index.
+- **More prompt rules can make a small model worse.** A rule "never state
+  facts before the tool result" did not stop it from guessing the weather
+  ("sunny, 22°C") before calling the tool, and made it call `get_weather`
+  in a loop. We removed the rule and handle loops in the harness instead:
+  a repeated identical tool call is not run again.
+- **Text written before a tool call is a guess.** Trust the tool results and
+  the final answer, not what the model says before the call.
 
 ## Setup
 
@@ -103,7 +119,19 @@ adaptation, not an official method.
 
 ## Run
 
-Run the scripts from the project folder:
+Run the scripts from the project folder.
+
+**Chat with the agent:**
+
+```
+.venv/bin/python baudrier.py
+.venv/bin/python baudrier.py --model models/apertus-v1.5-8b-text-8bit
+.venv/bin/python baudrier.py --quiet     # hide the tool calls
+```
+
+In the chat, `/reset` forgets the conversation and `/exit` (or Ctrl+D) quits.
+
+**The learning steps:**
 
 ```
 .venv/bin/python step1_template.py
@@ -118,7 +146,7 @@ All scripts have type hints. To check them (optional):
 
 ```
 .venv/bin/pip install mypy
-.venv/bin/mypy --ignore-missing-imports tools.py step3_agent_loop.py
+.venv/bin/mypy --ignore-missing-imports tools.py agent.py baudrier.py
 ```
 
 Check the standalone scripts one by one (they define the same names).
