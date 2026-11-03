@@ -1,0 +1,12 @@
+# Python environment (recreate with: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt)
+.venv/
+
+# Converted models (several GB; recreate with the convert scripts)
+models/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
