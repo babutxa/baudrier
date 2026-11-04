@@ -29,8 +29,9 @@ loop:
 | `baudrier.py` | **The chat**, like Claude Code: you write, the agent answers (using tools), you write again. It remembers the conversation. |
 | `agent.py` | The `Agent` class: the model, the inner loop (`ask()`: tool calls until the answer), tool-call parsing and the protections. |
 | `step3_agent_loop.py` | The agent loop for one question (uses `agent.py`). |
-| `tools.py` | The tools: `get_weather` (conditions, rain, clouds, sunshine, UV), `list_files`, `read_file` (only inside `workspace/`). Each tool is a typed function; the description the model sees is generated from the type hints and the docstring. |
-| `workspace/` | Example notes for the file tools. |
+| `tools.py` | The tools: `get_weather` (conditions, rain, clouds, sunshine, UV), `list_files`, `read_file` (only inside the workspace folder). Each tool is a typed function; the description the model sees is generated from the type hints and the docstring. |
+| `examples/notes/` | Fictional demo notes for the file tools. |
+| `workspace/` | Your own notes (not in git, created on first run). It is the default folder the agent can read. |
 | `convert_v15_to_mlx.py` | Extracts the text model from the official Apertus v1.5 8B and converts it to MLX 4-bit. |
 | `experiments/` | Tests used to compare Apertus v1.0 and v1.5 on tool calling. |
 
@@ -124,12 +125,14 @@ Run the scripts from the project folder.
 **Chat with the agent:**
 
 ```
-.venv/bin/python baudrier.py
+.venv/bin/python baudrier.py                              # reads your notes in workspace/
+.venv/bin/python baudrier.py --workspace examples/notes   # reads the demo notes
 .venv/bin/python baudrier.py --model models/apertus-v1.5-8b-text-8bit
-.venv/bin/python baudrier.py --quiet     # hide the tool calls
+.venv/bin/python baudrier.py --quiet                      # hide the tool calls
 ```
 
 In the chat, `/reset` forgets the conversation and `/exit` (or Ctrl+D) quits.
+`step3_agent_loop.py` uses the demo notes by default.
 
 **The learning steps:**
 

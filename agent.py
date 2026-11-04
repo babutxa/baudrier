@@ -15,6 +15,7 @@ from typing import Any
 
 from mlx_lm import load, stream_generate
 
+import tools
 from tools import TOOL_DESCRIPTIONS, TOOL_FUNCTIONS, ToolResult
 
 # Type aliases (like "using" in C++):
@@ -91,9 +92,12 @@ def run_tool(name: str, args: dict[str, Any]) -> ToolResult:
 
 class Agent:
     def __init__(self, model_path: str = DEFAULT_MODEL, max_steps: int = 8,
-                 verbose: bool = True) -> None:
+                 verbose: bool = True, workspace: str | None = None) -> None:
         self.max_steps = max_steps  # safety: stop if the model never gives a final answer
         self.verbose = verbose      # print each step (tool calls, token counts)
+        if workspace is not None:
+            tools.set_workspace(workspace)
+        tools.WORKSPACE.mkdir(exist_ok=True)  # the default workspace/ may not exist yet
         # load() is declared to return 2 or 3 values (3 with return_config=True),
         # so we take the first two by index: correct for the type checker in both cases.
         loaded = load(model_path)

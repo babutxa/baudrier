@@ -16,8 +16,19 @@ from typing import Any, Callable
 
 from transformers.utils import get_json_schema
 
-# The only folder the file tools can access.
+# The only folder the file tools can access. Default: workspace/ in the
+# project (your own notes, not in git). Change it with set_workspace(),
+# e.g. to examples/notes for the demo notes.
 WORKSPACE: Path = Path(__file__).parent / "workspace"
+
+
+def set_workspace(path: str | Path) -> None:
+    """Choose the folder the file tools can access."""
+    global WORKSPACE
+    folder = Path(path).resolve()
+    if not folder.is_dir():
+        raise FileNotFoundError(f"Workspace folder not found: {folder}")
+    WORKSPACE = folder
 
 
 # ---------------------------------------------------------------------------
