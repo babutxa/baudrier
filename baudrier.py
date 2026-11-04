@@ -18,6 +18,7 @@ Usage:
     python baudrier.py --workspace examples/notes   # use the demo notes
 """
 import argparse
+import sys
 
 import tools
 from agent import DEFAULT_MODEL, Agent
@@ -27,6 +28,14 @@ parser.add_argument("--model", default=DEFAULT_MODEL, help="path of the MLX mode
 parser.add_argument("--workspace", help="folder the agent can read (default: workspace/)")
 parser.add_argument("--quiet", action="store_true", help="hide the tool calls and token counts")
 cli = parser.parse_args()
+
+# Check the workspace before loading the model (which takes a few seconds),
+# and show a short error instead of a Python traceback.
+if cli.workspace is not None:
+    try:
+        tools.set_workspace(cli.workspace)
+    except FileNotFoundError as e:
+        sys.exit(f"Error: {e}")
 
 print(f"Loading {cli.model}...")
 agent = Agent(cli.model, verbose=not cli.quiet, workspace=cli.workspace)

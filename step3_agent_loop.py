@@ -10,7 +10,9 @@ Usage:
     python step3_agent_loop.py --workspace workspace "..."   # your own notes
 """
 import argparse
+import sys
 
+import tools
 from agent import DEFAULT_MODEL, Agent
 
 # Command-line options (argparse also generates --help).
@@ -22,6 +24,13 @@ parser.add_argument("--model", default=DEFAULT_MODEL, help="path of the MLX mode
 parser.add_argument("--workspace", default="examples/notes",
                     help="folder the agent can read (default: examples/notes)")
 cli = parser.parse_args()
+
+# Check the workspace before loading the model (which takes a few seconds),
+# and show a short error instead of a Python traceback.
+try:
+    tools.set_workspace(cli.workspace)
+except FileNotFoundError as e:
+    sys.exit(f"Error: {e}")
 
 print(f"Loading {cli.model}...")
 agent = Agent(cli.model, workspace=cli.workspace)
