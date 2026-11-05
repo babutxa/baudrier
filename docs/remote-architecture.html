@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baudrier Remote Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  /* Layout: one wide diagram, then two short reference sections. Accent = the new remote-access parts. */
+  --paper: #F4F6F9;
+  --card: #FFFFFF;
+  --device: #E9EDF3;
+  --ink: #15202E;
+  --ink-soft: #3B4757;
+  --muted: #7A8594;
+  --line: #D3DAE4;
+  --line-strong: #9AA6B6;
+  --accent: #1D63C9;
+  --accent-soft: #E1ECFB;
+  --display: "Sora", -apple-system, "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #10151D;
+    --card: #19202B;
+    --device: #141B25;
+    --ink: #E6EBF2;
+    --ink-soft: #C0C9D5;
+    --muted: #8692A2;
+    --line: #2A3442;
+    --line-strong: #4C5970;
+    --accent: #6EA8FF;
+    --accent-soft: #1A2B45;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #10151D;
+  --card: #19202B;
+  --device: #141B25;
+  --ink: #E6EBF2;
+  --ink-soft: #C0C9D5;
+  --muted: #8692A2;
+  --line: #2A3442;
+  --line-strong: #4C5970;
+  --accent: #6EA8FF;
+  --accent-soft: #1A2B45;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.55;
+}
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+header { display: flex; flex-direction: column; gap: 8px; max-width: 70ch; }
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(26px, 4vw, 36px);
+  line-height: 1.15;
+  margin: 0;
+  text-wrap: balance;
+}
+.lede { margin: 0; color: var(--ink-soft); }
+h2 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 20px;
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+code { font-family: var(--mono); font-size: 0.9em; }
+
+figure {
+  margin: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  overflow-x: auto;
+}
+figure svg { display: block; width: 100%; min-width: 760px; height: auto; }
+figcaption { margin-top: 12px; color: var(--ink-soft); font-size: 15px; max-width: 75ch; }
+
+/* SVG styling through the theme tokens */
+.frame { fill: var(--device); stroke: var(--line-strong); stroke-width: 1.5; }
+.box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1.2; }
+.box.new { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+.box.later { fill: none; stroke: var(--muted); stroke-width: 1.3; stroke-dasharray: 6 5; }
+.band { fill: var(--accent-soft); }
+.t-dev { font: 700 16px var(--display); fill: var(--ink); }
+.t-title { font: 600 13.5px var(--display); fill: var(--ink); }
+.t { font: 12.5px var(--body); fill: var(--ink-soft); }
+.t-code { font: 11.5px var(--mono); fill: var(--ink-soft); }
+.t-small { font: 11px var(--body); fill: var(--muted); }
+.t-label { font: 500 11px var(--body); fill: var(--ink-soft); }
+.t-label.new { fill: var(--accent); }
+.later-text { fill: var(--muted); }
+.arrow { fill: none; stroke: var(--ink-soft); stroke-width: 1.5; }
+.arrow.new { stroke: var(--accent); stroke-width: 1.8; }
+.arrow.tunnel { stroke: var(--accent); stroke-width: 3; }
+.arrow.later { stroke: var(--muted); stroke-dasharray: 5 4; }
+.arrow.coord { stroke: var(--line-strong); stroke-dasharray: 3 4; }
+.head { fill: var(--ink-soft); }
+.head.new { fill: var(--accent); }
+.head.later { fill: var(--muted); }
+.swatch-built { fill: var(--card); stroke: var(--line-strong); }
+.swatch-new { fill: var(--accent-soft); stroke: var(--accent); }
+.swatch-later { fill: none; stroke: var(--muted); stroke-dasharray: 4 3; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 28px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line); }
+th { font-family: var(--display); font-weight: 600; font-size: 13px; color: var(--muted); }
+td:first-child { font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+.tag {
+  display: inline-block; font-size: 12px; font-weight: 500; line-height: 1;
+  padding: 3px 7px; border-radius: 999px; margin-left: 4px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.tag.later { background: transparent; color: var(--muted); border: 1px dashed var(--muted); }
+
+ol.steps { margin: 0; padding-left: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 12px; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+ol.steps li::before {
+  content: counter(s);
+  font: 600 13px var(--display);
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+ul.notes { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+
+@media (max-width: 420px) {
+  main { padding-top: 28px; }
+  section { padding: 18px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Baudrier Remote Setup</h1>
+    <p class="lede">How you would chat with Baudrier from your phone, and on which device each part runs. The model, the agent and your notes all stay on your Mac.</p>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 1200 760" role="img" aria-label="Your phone shows a chat page and talks to your MacBook Air through a private Tailscale network. On the Mac, server.py passes each message to agent.py, which runs the Apertus model and the tools. Internet services: Tailscale servers for login and keys, Open-Meteo for weather, and later Dropbox for documents.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah-new" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head new" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah-tunnel" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path class="head new" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah-later" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head later" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- Legend -->
+      <rect class="swatch-built" x="20" y="26" width="20" height="13" rx="3"/>
+      <text class="t" x="48" y="37">built today</text>
+      <rect class="swatch-new" x="20" y="50" width="20" height="13" rx="3"/>
+      <text class="t" x="48" y="61">new: remote access</text>
+      <rect class="swatch-later" x="20" y="74" width="20" height="13" rx="3"/>
+      <text class="t" x="48" y="85">later: family manager</text>
+
+      <!-- ===== Phone ===== -->
+      <rect class="frame" x="20" y="110" width="220" height="300" rx="26"/>
+      <text class="t-dev" x="40" y="140">Your phone</text>
+      <text class="t-small" x="40" y="158">Wi-Fi or mobile data</text>
+
+      <rect class="box new" x="40" y="172" width="180" height="54" rx="8"/>
+      <text class="t-title" x="130" y="194" text-anchor="middle">Browser: chat page</text>
+      <text class="t-code" x="130" y="214" text-anchor="middle">macbook-air:8000</text>
+
+      <line class="arrow new" x1="130" y1="228" x2="130" y2="254" marker-start="url(#ah-new)" marker-end="url(#ah-new)"/>
+      <text class="t-label new" x="140" y="245">POST /chat</text>
+
+      <rect class="box new" x="40" y="256" width="180" height="44" rx="8"/>
+      <text class="t-title" x="130" y="283" text-anchor="middle">Tailscale app</text>
+
+      <rect class="box later" x="40" y="330" width="180" height="58" rx="8"/>
+      <text class="t-title later-text" x="130" y="354" text-anchor="middle">Dropbox app</text>
+      <text class="t-small" x="130" y="374" text-anchor="middle">upload documents</text>
+
+      <!-- ===== Tunnel ===== -->
+      <rect class="band" x="244" y="264" width="172" height="28" rx="14"/>
+      <line class="arrow tunnel" x1="226" y1="278" x2="434" y2="278" marker-start="url(#ah-tunnel)" marker-end="url(#ah-tunnel)"/>
+      <text class="t-label new" x="330" y="256" text-anchor="middle">private network</text>
+      <text class="t-small" x="330" y="310" text-anchor="middle">Tailscale · encrypted</text>
+
+      <!-- Tailscale coordination servers -->
+      <line class="arrow coord" x1="330" y1="320" x2="330" y2="470"/>
+      <rect class="box" x="250" y="470" width="160" height="72" rx="10"/>
+      <text class="t-title" x="330" y="495" text-anchor="middle">Tailscale servers</text>
+      <text class="t" x="330" y="514" text-anchor="middle">login + keys only</text>
+      <text class="t-small" x="330" y="531" text-anchor="middle">no chat content</text>
+
+      <!-- ===== Mac ===== -->
+      <rect class="frame" x="420" y="44" width="760" height="596" rx="18"/>
+      <text class="t-dev" x="440" y="74">Your MacBook Air</text>
+      <text class="t-small" x="440" y="94">at home · M1 · 16 GB · must be awake</text>
+
+      <rect class="box new" x="440" y="256" width="100" height="44" rx="8"/>
+      <text class="t-title" x="490" y="283" text-anchor="middle">Tailscale</text>
+
+      <line class="arrow new" x1="542" y1="278" x2="583" y2="278" marker-start="url(#ah-new)" marker-end="url(#ah-new)"/>
+      <text class="t-label new" x="562" y="270" text-anchor="middle">http</text>
+
+      <rect class="box new" x="585" y="210" width="180" height="136" rx="10"/>
+      <text class="t-title" x="675" y="236" text-anchor="middle">server.py</text>
+      <text class="t-small" x="675" y="254" text-anchor="middle">FastAPI · port 8000</text>
+      <text class="t-code" x="675" y="284" text-anchor="middle">GET /  chat page</text>
+      <text class="t-code" x="675" y="304" text-anchor="middle">POST /chat</text>
+      <text class="t-code" x="675" y="324" text-anchor="middle">POST /reset</text>
+
+      <line class="arrow new" x1="767" y1="262" x2="818" y2="262" marker-end="url(#ah-new)"/>
+      <text class="t-label new" x="792" y="254" text-anchor="middle">ask()</text>
+      <line class="arrow new" x1="818" y1="302" x2="767" y2="302" marker-end="url(#ah-new)"/>
+      <text class="t-label new" x="792" y="294" text-anchor="middle">answer</text>
+
+      <rect class="box" x="820" y="210" width="180" height="136" rx="10"/>
+      <text class="t-title" x="910" y="236" text-anchor="middle">agent.py</text>
+      <text class="t-small" x="910" y="254" text-anchor="middle">class Agent</text>
+      <text class="t" x="910" y="282" text-anchor="middle">inner loop: ask()</text>
+      <text class="t" x="910" y="302" text-anchor="middle">repair tool calls</text>
+      <text class="t" x="910" y="322" text-anchor="middle">repeat guard</text>
+
+      <line class="arrow" x1="1002" y1="262" x2="1043" y2="262" marker-end="url(#ah)"/>
+      <text class="t-label" x="1022" y="254" text-anchor="middle">prompt</text>
+      <line class="arrow" x1="1043" y1="302" x2="1002" y2="302" marker-end="url(#ah)"/>
+      <text class="t-label" x="1022" y="294" text-anchor="middle">tokens</text>
+
+      <rect class="box" x="1045" y="210" width="115" height="136" rx="10"/>
+      <text class="t-title" x="1102" y="236" text-anchor="middle">Apertus v1.5</text>
+      <text class="t-small" x="1102" y="254" text-anchor="middle">8B · 4-bit</text>
+      <text class="t" x="1102" y="282" text-anchor="middle">4.3 GB</text>
+      <text class="t" x="1102" y="302" text-anchor="middle">mlx-lm</text>
+      <text class="t" x="1102" y="322" text-anchor="middle">M1 GPU</text>
+
+      <line class="arrow" x1="910" y1="348" x2="910" y2="398" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <text class="t-label" x="918" y="378">calls · results</text>
+
+      <rect class="box" x="820" y="400" width="180" height="80" rx="10"/>
+      <text class="t-title" x="910" y="426" text-anchor="middle">tools.py</text>
+      <text class="t-code" x="910" y="448" text-anchor="middle">get_weather</text>
+      <text class="t-code" x="910" y="468" text-anchor="middle">list_files · read_file</text>
+
+      <line class="arrow" x1="910" y1="482" x2="910" y2="528" marker-end="url(#ah)"/>
+      <text class="t-label" x="918" y="510">read only</text>
+
+      <rect class="box" x="820" y="530" width="180" height="70" rx="10"/>
+      <text class="t-title" x="910" y="558" text-anchor="middle">workspace/</text>
+      <text class="t-small" x="910" y="580" text-anchor="middle">your notes · not in git</text>
+
+      <rect class="box later" x="585" y="400" width="180" height="200" rx="10"/>
+      <text class="t-title later-text" x="675" y="428" text-anchor="middle">Later</text>
+      <text class="t" x="675" y="448" text-anchor="middle">family manager</text>
+      <text class="t" x="675" y="482" text-anchor="middle">watcher on</text>
+      <text class="t-code" x="675" y="502" text-anchor="middle">~/Dropbox/Family/</text>
+      <text class="t-code" x="675" y="520" text-anchor="middle">_inbox</text>
+      <text class="t-small" x="675" y="556" text-anchor="middle">asks you for approval</text>
+      <text class="t-small" x="675" y="572" text-anchor="middle">on the phone</text>
+
+      <!-- tools to Open-Meteo -->
+      <path class="arrow" d="M1002,440 H1100 V668" marker-end="url(#ah)"/>
+      <text class="t-label" x="1010" y="432">weather (HTTPS)</text>
+
+      <!-- ===== Internet services ===== -->
+      <text class="t-small" x="20" y="656" letter-spacing="1.5">INTERNET</text>
+
+      <rect class="box later" x="40" y="670" width="180" height="70" rx="10"/>
+      <text class="t-title later-text" x="130" y="698" text-anchor="middle">Dropbox</text>
+      <text class="t-small" x="130" y="718" text-anchor="middle">cloud storage (later)</text>
+
+      <line class="arrow later" x1="130" y1="390" x2="130" y2="668" marker-end="url(#ah-later)"/>
+      <text class="t-label" x="138" y="560">upload</text>
+
+      <path class="arrow later" d="M222,705 H675 V602" marker-end="url(#ah-later)"/>
+      <text class="t-label" x="448" y="697" text-anchor="middle">sync to the Mac</text>
+
+      <rect class="box" x="1020" y="670" width="160" height="70" rx="10"/>
+      <text class="t-title" x="1100" y="698" text-anchor="middle">Open-Meteo</text>
+      <text class="t-small" x="1100" y="718" text-anchor="middle">weather data</text>
+    </svg>
+    <figcaption>Every AI part runs on your Mac. The phone only shows a web page, and Tailscale connects the two devices without opening anything to the internet. Blue parts are the new work for remote access; dashed parts come later with the family manager.</figcaption>
+  </figure>
+
+  <div class="grid">
+    <section>
+      <h2>Where each part runs</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Device</th><th>What runs there</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Your phone</td>
+              <td>A browser with the chat page <span class="tag">new</span>, the Tailscale app <span class="tag">new</span>, later the Dropbox app <span class="tag later">later</span>. No app to build.</td>
+            </tr>
+            <tr>
+              <td>Your Mac</td>
+              <td>Tailscale <span class="tag">new</span>, <code>server.py</code> <span class="tag">new</span>, <code>agent.py</code>, <code>tools.py</code>, the Apertus model and <code>workspace/</code>. Later the watcher for <code>_inbox</code> <span class="tag later">later</span>.</td>
+            </tr>
+            <tr>
+              <td>Internet</td>
+              <td>Tailscale servers (login and keys only), Open-Meteo (weather), later Dropbox (your documents).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>One message, step by step</h2>
+      <ol class="steps">
+        <li><span>You type a question in the chat page on your phone.</span></li>
+        <li><span>The browser sends <code>POST /chat</code> through the Tailscale network to your Mac.</span></li>
+        <li><span><code>server.py</code> calls <code>agent.ask()</code> with your text.</span></li>
+        <li><span>The agent runs Apertus and the tools in a loop until it has an answer.</span></li>
+        <li><span>The answer goes back to <code>server.py</code>, then through Tailscale to your phone.</span></li>
+        <li><span>The conversation stays in the agent, so your next question can refer to it.</span></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>What stays private</h2>
+      <ul class="notes">
+        <li>The model, the agent and your notes never leave your Mac.</li>
+        <li>Nothing is open to the internet: only your own devices can reach port 8000.</li>
+        <li>Tailscale's servers help your devices find each other; your chat travels encrypted between them.</li>
+        <li>Your MacBook must be awake. For the family manager, an always-on Mac is better.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+</body>
+</html>

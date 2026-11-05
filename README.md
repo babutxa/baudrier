@@ -5,8 +5,9 @@
 This is a small **agent harness** written from scratch, to learn how AI agents
 work. The model is [Apertus](https://huggingface.co/swiss-ai), the open Swiss
 LLM, running **locally** on an Apple Silicon Mac with
-[MLX](https://github.com/ml-explore/mlx-lm). No agent framework, no API:
-just the model, a chat template, some Python tools, and a loop.
+[MLX](https://github.com/ml-explore/mlx-lm), or **remotely** (Apertus 70B) on an
+OpenAI-compatible server. No agent framework: just the model, a chat template,
+some Python tools, and a loop.
 
 An agent is:
 
@@ -27,7 +28,8 @@ loop:
 | `step1_template.py` | Shows the raw text the model reads: special tokens, roles and tool descriptions. |
 | `step2_one_cycle.py` | One full agent cycle: the model asks for `get_weather`, the harness calls the real weather API ([Open-Meteo](https://open-meteo.com)), the model answers. |
 | `baudrier.py` | **The chat**, like Claude Code: you write, the agent answers (using tools), you write again. It remembers the conversation. |
-| `agent.py` | The `Agent` class: the model, the inner loop (`ask()`: tool calls until the answer), tool-call parsing and the protections. |
+| `agent.py` | The `Agent` class: the inner loop (`ask()`: tool calls until the answer) and the protections. It works with any backend. |
+| `backends.py` | How the agent asks the model: `LocalBackend` (mlx-lm on this Mac; we apply the chat template and parse the tool calls) or `RemoteBackend` (an OpenAI-compatible server does it). |
 | `step3_agent_loop.py` | The agent loop for one question (uses `agent.py`). |
 | `tools.py` | The tools: `get_weather` (conditions, rain, clouds, sunshine, UV), `list_files`, `read_file` (only inside the workspace folder). Each tool is a typed function; the description the model sees is generated from the type hints and the docstring. |
 | `examples/notes/` | Fictional demo notes for the file tools. |
@@ -83,6 +85,18 @@ Other lessons:
   a repeated identical tool call is not run again.
 - **Text written before a tool call is a guess.** Trust the tool results and
   the final answer, not what the model says before the call.
+- **The bigger model makes the difference.** Same notes task, same tools:
+
+  | Apertus v1.5 | Where | Result |
+  |---|---|---|
+  | 8B, 4-bit or 8-bit | this Mac | sometimes the wrong city, or invented weather |
+  | 70B | Hugging Face (publicai) | list_files → read today.md → weather **Lucerne** → correct, clear answer |
+
+- **Remote servers have their own problems.** Cloudflare blocked Python's
+  default User-Agent (`Python-urllib`), so we send `baudrier/0.1`. And the
+  server rejected a tool call with empty arguments (`{}`) in the history,
+  although it is valid OpenAI format; the remote backend sends `{"_": null}`
+  instead (only in the copy it sends).
 
 ## Setup
 
@@ -134,6 +148,23 @@ Run the scripts from the project folder.
 In the chat, `/reset` forgets the conversation and `/exit` (or Ctrl+D) quits.
 `step3_agent_loop.py` uses the demo notes by default.
 
+**With a remote model (Apertus 70B):**
+
+```
+.venv/bin/python baudrier.py --backend remote
+```
+
+The settings come from environment variables, so no key is in the code:
+
+| Variable | Default | At the Hack Apertus (CSCS) |
+|---|---|---|
+| `BAUDRIER_API_BASE` | `https://router.huggingface.co/v1` | `https://gateway.keera.ch/api/v1` |
+| `BAUDRIER_MODEL` | `swiss-ai/Apertus-v1.5-70B:publicai` | `apertus-v1-5-70b` |
+| `BAUDRIER_API_KEY` | your `hf auth login` token (for Hugging Face) | the team key |
+
+With Hugging Face you need credit for Inference Providers. With a remote
+backend, your messages and tool results are sent to the server.
+
 **The learning steps:**
 
 ```
@@ -149,7 +180,7 @@ All scripts have type hints. To check them (optional):
 
 ```
 .venv/bin/pip install mypy
-.venv/bin/mypy --ignore-missing-imports tools.py agent.py baudrier.py
+.venv/bin/mypy --ignore-missing-imports tools.py backends.py agent.py baudrier.py
 ```
 
 Check the standalone scripts one by one (they define the same names).
